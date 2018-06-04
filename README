@@ -1,1 +1,101 @@
+1. 驱动编译
+A. 确认开发环境搭建完成:
+    在ubuntu命令终端下进入源码目录, 输入命令
+    # mk_kernel.sh && mk_sd_image.sh
+    会在/mnt/workspace/linux/images/sd_image目录下生成BOOT.bin, devicetree.dtb, uImage, uramdisk.image.gz四个文件; 
+    将其拷贝到sd卡来启动xilinx开发板.
+
+B. 拷贝bit文件
+    将vivado生成的比特文件拷贝到/mnt/workspace/linux/output/target目录下替换system_wrapper.bit文件.
+
+C. 修改设备树文件
+    将设备树文件文件拷贝到/mnt/workspace/linux/kernel/arch/arm/boot/dts目录下替换zynq-7000.dtsi, zynq-zed.dts文件.
+
+D. 驱动文件添加进源码
+    在/mnt/workspace/linux/kernel/drivers目录下创建extern文件夹, 用于放置驱动文件, 将驱动目录下所有文件拷贝到extern文件夹下, 修改 drivers目录下的Makefile文件, 加入如下内容: 
+        obj-$(CONFIG_EXTERN)	+= extern/
+    修改 drivers目录下的Kconfig文件，加入如下内容: 
+        source "drivers/extern/Kconfig"
+
+E. 编译内核源码
+    在内核源码目录下输入命令: 
+    # make ARCH=arm menuconfig
+    勾选以下内核配置选项
+        Device Drivers  --->  
+            skycaster external driver support  --->
+                ---skycaster external driver support 
+                [*] enable debug message
+                <*> emio spi driver
+                <*> axidma driver
+    在终端输入以下命令, 生成SD卡启动文件.
+    # mk_kernel.sh && mk_sd_image.sh 
+
+
+2 用户程序编译
+A. 编译SPI应用程序
+    在终端输入命令
+    # arm-xilinx-linux-gnueabi-gcc spi_write_reg.c -ospi_write_reg
+    生成可执行文件spi_write_reg, 拷贝到SD卡.
+
+B. 编译DMA应用程序
+    在终端输入命令
+    # arm-xilinx-linux-gnueabi-gcc axidma_transfer.c  util.c libaxidma.c -odma_transfer
+    生成可执行文件dma_transfer, 拷贝到SD卡.
+
+C. 编译制作传输文件应用程序
+    将要发送的数据改为数组格式，保存为data.h文件, 在终端输入命令
+    # gcc mk_file.c -omk_file 
+    执行生成文件
+    # ./mk_file 
+    得到要传输的文件infile, 拷贝到SD卡.
+
+
+3. 生成文件及使用说明
+A. 驱动部分
+    将生成的SD卡启动文件拷贝到SD卡上, 上电启动开发版, 查看驱动加载信息: 
+        emio-spi emio_spi: iSCLK: 0x3c3
+        emio-spi emio_spi: iSDIN: 0x3c1
+        emio-spi emio_spi: iSDOUT: 0x3c2
+        emio-spi emio_spi: iCS : 0x3c4
+        emio-spi emio_spi: BUS_ID       4
+        emio-spi emio_spi: spi_gpio platform device registered.
+        emio-spi emio_spi: spi device registered.
+        emio-spi : Char Device Region Registered, with Major: 244.
+        emio-spi : spi_gpio device class registered.
+        emio-gpio-spi [emio_spi] SPI Probing
+        emio-gpio-spi [emio_spi] spi_probe: setup char device
+        emio-gpio-spi [emio_spi] spi_probe: initialize device
+        axidma: axidma_dma.c: axidma_dma_init: 706: DMA: Found 1 transmit channels and 0 receive channels.
+        axidma: axidma_dma.c: axidma_dma_init: 708: VDMA: Found 0 transmit channels and 0 receive channels.
+    查看驱动生成的设备节点: 
+    zynq> ls /dev/*
+        /dev/axidma    /dev/emio_spi
+
+B. SPI配置AD9957
+    在开发板终端中输入
+    zynq> ./spi_write_reg
+    配置AD9957并关闭PDCLK输出, 
+    zynq> ./spi_write_reg 1
+    配置AD9957并使能PDCLK输出. 打印信息如下: 
+        gpio init the pin(960)
+        gpio set the pin(960) direction is out
+        /dev/emio_spi open success!
+        write ad9957 reg enable
+        write ad9957 reg enable
+        write ad9957 reg enable
+        write ad9957 reg enable
+        
+C. DMA传输文件
+    在串口终端中输入
+    zynq> ./dma_transfer infile outfile
+    开始循环发送数据, 打印信息如下: 
+        AXI DMA File Transfer Info:
+            Transmit Channel: 0
+            Receive Channel: -1
+            Input File Size: 0.00 Mb
+            Output File Size: 0.00 Mb
+
+
+4. 注意事项
+A. 根据项目需求, 本次DMA用户程序只使用了dma写通道, 如果要实现同时读写, 请自行修改用户程序源码;
 
