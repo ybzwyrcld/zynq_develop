@@ -1,0 +1,24 @@
+menuconfig EXTERN
+	bool "skycaster external driver support"
+	depends on HAS_IOMEM && OF
+	help
+		Skycaster Driver Support
+
+if EXTERN
+
+config DEBUG
+	bool "enable debug message"
+
+config EMIOSPI
+	tristate "emio spi driver"
+	depends on SPI_BITBANG
+	depends on SPI_GPIO
+	help
+		This is the emio-spi driver. Uses SPI over GPIO.
+
+config AXIDMA
+	tristate "axidma driver"
+	help
+		This is the axi-dma driver. Uses DMA.
+
+endif # EXTERN
